@@ -61,11 +61,42 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: 12,
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            WeatherStat(icon: Icons.air, value: '4 km/h'),
-                            WeatherStat(icon: Icons.water_drop, value: '72%'),
-                            WeatherStat(icon: Icons.speed, value: '1016 hPa'),
+                            Expanded(
+                              child: WeatherStat(
+                                icon: Icons.air,
+                                label: 'Wind',
+                                value: '4 km/h',
+                              ),
+                            ),
+                            Container(
+                              height: 36,
+                              width: 1,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.12),
+                            ),
+                            Expanded(
+                              child: WeatherStat(
+                                icon: Icons.water_drop,
+                                label: 'Humidity',
+                                value: '72%',
+                              ),
+                            ),
+                            Container(
+                              height: 36,
+                              width: 1,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.12),
+                            ),
+                            Expanded(
+                              child: WeatherStat(
+                                icon: Icons.speed,
+                                label: 'Pressure',
+                                value: '1016 hPa',
+                              ),
+                            ),
                           ],
                         ),
                       ),

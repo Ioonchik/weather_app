@@ -33,7 +33,13 @@ class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
                 ),
               ],
             ),
-            Icon(Icons.cloud_rounded, size: 72, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)),
+            Icon(
+              Icons.cloud_rounded,
+              size: 72,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.8),
+            ),
           ],
         ),
       ),
