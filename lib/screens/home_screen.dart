@@ -35,146 +35,143 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  City? selectedCity;
+  Place? selectedPlace;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: selectedCity != null
-            ? Text(selectedCity!.name)
-            : Text('Weather'),
+        title: Text('Weather'),
         actions: [
-          selectedCity != null
+          selectedPlace != null
               ? IconButton(onPressed: () {}, icon: Icon(Icons.refresh_rounded))
               : SizedBox.shrink(),
         ],
       ),
-      body: selectedCity != null
-          ? Padding(
-              padding: EdgeInsets.all(16),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 12,
-                  children: [
-                    SearchBar(
-                      hintText: 'Search city',
-                      leading: Icon(Icons.search_rounded),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SearchScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    CurrentWeatherCard(),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: WeatherStat(
-                                icon: Icons.air,
-                                label: 'Wind',
-                                value: '4 km/h',
-                              ),
-                            ),
-                            Container(
-                              height: 36,
-                              width: 1,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.12),
-                            ),
-                            Expanded(
-                              child: WeatherStat(
-                                icon: Icons.water_drop,
-                                label: 'Humidity',
-                                value: '72%',
-                              ),
-                            ),
-                            Container(
-                              height: 36,
-                              width: 1,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.12),
-                            ),
-                            Expanded(
-                              child: WeatherStat(
-                                icon: Icons.speed,
-                                label: 'Pressure',
-                                value: '1016 hPa',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text(
-                        '7-Day Forecast',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    Details(),
-                  ],
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          spacing: 16,
+          children: [
+            InkWell(
+              child: IgnorePointer(
+                child: SearchBar(
+                  hintText: selectedPlace?.name ?? 'Search city',
+                  leading: Icon(Icons.search_rounded),
+                  readOnly: true,
                 ),
               ),
-            )
-          : Padding(
-              // if no city is selected
-              padding: EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  SearchBar(
-                    hintText: 'Search city',
-                    leading: Icon(Icons.search_rounded),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => SearchScreen()),
-                      );
-                    },
-                  ),
-                  Expanded(
-                    // if no city is selected, take up remaining space
-                    child: Center(
+              onTap: () async {
+                final Place? place = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => SearchScreen()),
+                );
+                if (place != null) {
+                  setState(() {
+                    selectedPlace = place;
+                  });
+                }
+              },
+            ),
+            selectedPlace != null
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 12,
+                    children: [
+                      CurrentWeatherCard(),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: WeatherStat(
+                                  icon: Icons.air,
+                                  label: 'Wind',
+                                  value: '4 km/h',
+                                ),
+                              ),
+                              Container(
+                                height: 36,
+                                width: 1,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.12),
+                              ),
+                              Expanded(
+                                child: WeatherStat(
+                                  icon: Icons.water_drop,
+                                  label: 'Humidity',
+                                  value: '72%',
+                                ),
+                              ),
+                              Container(
+                                height: 36,
+                                width: 1,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.12),
+                              ),
+                              Expanded(
+                                child: WeatherStat(
+                                  icon: Icons.speed,
+                                  label: 'Pressure',
+                                  value: '1016 hPa',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(
+                          '7-Day Forecast',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      Details(),
+                    ],
+                  )
+                : Expanded(
+                  child: Center(
+                    child: Opacity(
+                      opacity: 0.8,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         spacing: 10,
                         children: [
                           Icon(Icons.cloud_off_rounded, size: 64),
                           Text('Pick a city or use location'),
-                          FilledButton(
-                            onPressed: () {
-                              setState(() {
-                                selectedCity = City(
-                                  id: 1,
-                                  name: 'Astana',
-                                  country: 'Kazakhstan',
-                                );
-                              });
-                            },
-                            child: Text('Pick a city'),
-                          ),
                         ],
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+          ],
+        ),
+      ),
     );
   }
+}
+
+class Place {
+  final String name;
+  final String country;
+  final double latitude;
+  final double longitude;
+  final String region;
+
+  Place({
+    required this.name,
+    required this.country,
+    required this.latitude,
+    required this.longitude,
+    required this.region,
+  });
 }
 
 class ForecastCard extends StatelessWidget {
