@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:weather_app/models/place.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -12,11 +13,17 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  void _testGeocodingApi() async {
-    final uri = Uri.parse(
-      'https://geocoding-api.open-meteo.com/v1/search?name=Almaty&count=5&language=en',
-    );
-    final response = await http.get(uri);
+  @override
+  void initState() {
+    super.initState();
+    _loadRecent();
+  }
+
+  @override
+  dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
   }
 
   Future<List<Place>> searchPlaces(String query) async {
@@ -85,11 +92,48 @@ class _SearchScreenState extends State<SearchScreen> {
         });
       }
     });
+  }
 
-    dispose() {
-      _controller.dispose();
-      _debounce?.cancel();
+
+  List<Place> _recent = [];
+  static const _recentKey = 'recent_places';
+
+  void _addToRecent(Place place) {
+    _recent.removeWhere(
+      (p) => p.latitude == place.latitude && p.longitude == place.longitude,
+    );
+
+    _recent.insert(0, place);
+
+    if (_recent.length > 5) {
+      _recent = _recent.sublist(0, 5);
     }
+    print(_recent.map((e) => e.name).toList());
+  }
+
+  Future<void> _saveRecent() async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> storedPlaces = _recent
+        .map((place) => jsonEncode(place.toJson()))
+        .toList();
+
+    await prefs.setStringList(_recentKey, storedPlaces);
+  }
+
+  Future<void> _loadRecent() async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> storedPlaces = prefs.getStringList(_recentKey) ?? [];
+    final List<Place> places = <Place>[];
+
+    for (final placeJson in storedPlaces) {
+      final Map<String, dynamic> jsonMap = jsonDecode(placeJson);
+      places.add(Place.fromStoredJson(jsonMap));
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _recent = places;
+    });
   }
 
   @override
@@ -105,25 +149,48 @@ class _SearchScreenState extends State<SearchScreen> {
               leading: Icon(Icons.search_rounded),
               controller: _controller,
               onChanged: _onQueryChanged,
-              trailing: [if(_controller.text.isNotEmpty)
-                IconButton(
-                  icon: Icon(Icons.close_rounded),
-                  onPressed: () {
-                    _controller.clear();
-                    setState(() {
-                      _results = [];
-                      _isLoading = false;
-                      _errorText = null;
-                    });
-                  },
-                ),
+              trailing: [
+                if (_controller.text.isNotEmpty)
+                  IconButton(
+                    icon: Icon(Icons.close_rounded),
+                    onPressed: () {
+                      _controller.clear();
+                      setState(() {
+                        _results = [];
+                        _isLoading = false;
+                        _errorText = null;
+                      });
+                    },
+                  ),
               ],
             ),
-            Expanded(child: 
-              _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : _errorText != null
+            Expanded(
+              child: _controller.text.length < 2
+                  ? _recent.isEmpty
+                        ? Center(child: Text('Type to search'))
+                        : ListView.builder(
+                          itemCount: _recent.length,
+                          itemBuilder: (context, index) {
+                            final place = _recent[index];
+                            return ListTile(
+                              title: Text(place.name),
+                              leading: Icon(Icons.history_rounded),
+                              subtitle: Text(
+                                '${place.country} ${place.admin1 != null ? '• ${place.admin1}' : ''}',
+                              ),
+                              trailing: Icon(Icons.north_east),
+                              onTap: () {
+                                Navigator.pop(context, place);
+                              },
+                            );
+                          },
+                        )
+                  : _isLoading
+                  ? Center(child: CircularProgressIndicator())
+                  : _errorText != null
                   ? Center(child: Text(_errorText!))
+                  : _results.isEmpty
+                  ? Center(child: Text('No results'))
                   : ListView.builder(
                       itemCount: _results.length,
                       itemBuilder: (context, index) {
@@ -131,43 +198,19 @@ class _SearchScreenState extends State<SearchScreen> {
                         return ListTile(
                           title: Text(place.name),
                           leading: Icon(Icons.location_city),
-                          subtitle: Text('${place.country} ${place.admin1 != null ? '• ${place.admin1}' : ''}'),
+                          subtitle: Text(
+                            '${place.country} ${place.admin1 != null ? '• ${place.admin1}' : ''}',
+                          ),
                           trailing: Icon(Icons.north_east),
-                          onTap: () {
+                          onTap: () async {
+                            setState(() => _addToRecent(place));
+                            await _saveRecent();
                             Navigator.pop(context, place);
                           },
                         );
                       },
                     ),
             ),
-            // ListTile(
-            //   title: Text('Almaty'),
-            //   leading: Icon(Icons.location_city),
-            //   subtitle: Text('Kazakhstan • Almaty oblysy'),
-            //   trailing: Icon(Icons.north_east),
-            //   onTap: () {
-            //     Navigator.pop(
-            //       context,
-            //       Place(
-            //         name: 'Almaty',
-            //         country: 'Kazakhstan',
-            //         latitude: 43.25,
-            //         longitude: 76.92,
-            //         region: 'Almaty oblysy',
-            //       ),
-            //     );
-            //   },
-            // ),
-            // ElevatedButton(
-            //   onPressed: () async {
-            //     final places = await searchPlaces('Almaty');
-            //     print('Found: ${places.length} places');
-            //     if (places.isNotEmpty) {
-            //       print('First place: ${places[0].name}, ${places[0].country}');
-            //     }
-            //   },
-            //   child: Text('Test API'),
-            // ),
           ],
         ),
       ),
