@@ -20,7 +20,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   @override
-  dispose() {
+  void dispose() {
     _debounce?.cancel();
     _controller.dispose();
     super.dispose();
@@ -94,7 +94,6 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-
   List<Place> _recent = [];
   static const _recentKey = 'recent_places';
 
@@ -136,6 +135,53 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
+  // Highlights the matching part of the place name
+  TextSpan _highlightMatch({
+    required String text,
+    required String query,
+    required TextStyle normalStyle,
+    required TextStyle highlightStyle,
+  }) {
+    final q = query.trim();
+    if (q.isEmpty) {
+      return TextSpan(text: text, style: normalStyle);
+    }
+
+    final queryLower = q.toLowerCase();
+    final textLower = text.toLowerCase();
+
+    final startIndex = textLower.indexOf(queryLower);
+    if (startIndex < 0) {
+      return TextSpan(text: text, style: normalStyle);
+    }
+
+    final endIndex = startIndex + q.length;
+
+    return TextSpan(
+      children: [
+        TextSpan(text: text.substring(0, startIndex), style: normalStyle),
+        TextSpan(
+          text: text.substring(startIndex, endIndex),
+          style: highlightStyle,
+        ),
+        TextSpan(text: text.substring(endIndex), style: normalStyle),
+      ],
+    );
+  }
+
+  Widget _buildLoadingSkeleton() {
+  return ListView.builder(
+    itemCount: 6,
+    itemBuilder: (context, index) {
+      return ListTile(
+        leading: _SkeletonCircle(size: 28),
+        title: _SkeletonLine(widthFactor: 0.55),
+        subtitle: _SkeletonLine(widthFactor: 0.35),
+      );
+    },
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -169,24 +215,35 @@ class _SearchScreenState extends State<SearchScreen> {
                   ? _recent.isEmpty
                         ? Center(child: Text('Type to search'))
                         : ListView.builder(
-                          itemCount: _recent.length,
-                          itemBuilder: (context, index) {
-                            final place = _recent[index];
-                            return ListTile(
-                              title: Text(place.name),
-                              leading: Icon(Icons.history_rounded),
-                              subtitle: Text(
-                                '${place.country} ${place.admin1 != null ? '• ${place.admin1}' : ''}',
-                              ),
-                              trailing: Icon(Icons.north_east),
-                              onTap: () {
-                                Navigator.pop(context, place);
-                              },
-                            );
-                          },
-                        )
+                            itemCount: _recent.length+1,
+                            itemBuilder: (context, index) {
+                              if (index == 0) {
+                                return ListTile(
+                                  title: Text('Recent searches'),
+                                  trailing: TextButton(onPressed: () {
+                                    setState(() {
+                                      _recent.clear();
+                                    });
+                                    _saveRecent();
+                                  }, child: Text('Clear All')),
+                                );
+                              }
+                              final place = _recent[index-1];
+                              return ListTile(
+                                title: Text(place.name),
+                                leading: Icon(Icons.history_rounded),
+                                subtitle: Text(
+                                  '${place.country} ${place.admin1 != null ? '• ${place.admin1}' : ''}',
+                                ),
+                                trailing: Icon(Icons.north_east),
+                                onTap: () {
+                                  Navigator.pop(context, place);
+                                },
+                              );
+                            },
+                          )
                   : _isLoading
-                  ? Center(child: CircularProgressIndicator())
+                  ? _buildLoadingSkeleton()
                   : _errorText != null
                   ? Center(child: Text(_errorText!))
                   : _results.isEmpty
@@ -196,7 +253,19 @@ class _SearchScreenState extends State<SearchScreen> {
                       itemBuilder: (context, index) {
                         final place = _results[index];
                         return ListTile(
-                          title: Text(place.name),
+                          title: RichText(
+                            text: _highlightMatch(
+                              text: place.name,
+                              query: _controller.text,
+                              normalStyle: Theme.of(
+                                context,
+                              ).textTheme.titleMedium!,
+                              highlightStyle: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium!
+                                  .copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
                           leading: Icon(Icons.location_city),
                           subtitle: Text(
                             '${place.country} ${place.admin1 != null ? '• ${place.admin1}' : ''}',
@@ -217,3 +286,42 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 }
+
+class _SkeletonLine extends StatelessWidget {
+  final double widthFactor;
+  const _SkeletonLine({required this.widthFactor});
+
+  @override
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      widthFactor: widthFactor,
+      child: Container(
+        height: 12,
+        margin: EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(6),
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonCircle extends StatelessWidget {
+  final double size;
+  const _SkeletonCircle({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.10),
+      ),
+    );
+  }
+}
+
+
