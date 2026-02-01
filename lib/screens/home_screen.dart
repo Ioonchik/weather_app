@@ -3,6 +3,8 @@ import 'package:weather_app/screens/search_screen.dart';
 import 'package:weather_app/widgets/current_weather_card.dart';
 import 'package:weather_app/widgets/weather_stat.dart';
 
+import '../models/place.dart';
+
 class City {
   final int id;
   final String name;
@@ -158,21 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class Place {
-  final String name;
-  final String country;
-  final double latitude;
-  final double longitude;
-  final String region;
 
-  Place({
-    required this.name,
-    required this.country,
-    required this.latitude,
-    required this.longitude,
-    required this.region,
-  });
-}
 
 class ForecastCard extends StatelessWidget {
   const ForecastCard({super.key, required this.day});
