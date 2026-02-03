@@ -1,7 +1,7 @@
 class ForecastDay {
   final DateTime date;
-  final int minTempC;
-  final int maxTempC;
+  final double minTempC;
+  final double maxTempC;
   final int weatherCode;
 
   ForecastDay({
