@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:weather_app/screens/search_screen.dart';
+import 'package:weather_app/services/location_service.dart';
 import 'package:weather_app/widgets/current_weather_card.dart';
 import 'package:weather_app/widgets/weather_stat.dart';
 
@@ -39,6 +41,114 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   Place? selectedPlace;
 
+  final LocationService _locationService = LocationService();
+  bool _isLocating = false;
+  Position? _currentPosition;
+
+  Future<void> _useMyLocation() async {
+    if (_isLocating) return;
+
+    setState(() {
+      _isLocating = true;
+    });
+
+    try {
+      final position = await _locationService.getCurrentPositionOrThrow();
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentPosition = position;
+      });
+      print(_currentPosition);
+    } on PermissionDenied {
+      await _showPermissionDeniedDialog();
+    } on PermissionDeniedForever {
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Enable location permission?'),
+          content: Text(
+            'Location permissions are permanently denied. Please enable them in settings to use this feature.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await Geolocator.openAppSettings();
+              },
+              child: Text('Open settings'),
+            ),
+          ],
+        ),
+      );
+    } on LocationServiceDisabled {
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Location services disabled'),
+          content: Text(
+            'Please enable location services in your device settings to use this feature.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await Geolocator.openLocationSettings();
+              },
+              child: Text('Open location settings'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error getting location: $e'),
+        )
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLocating = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _showPermissionDeniedDialog() async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Allow location access?'),
+        content: Text(
+          'We use your location to show local weather. Allow access to continue.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Future.microtask(_useMyLocation);
+            },
+            child: Text('Try again'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Not now'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -74,6 +184,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                 }
               },
+            ),
+            TextButton.icon(
+              onPressed: _isLocating ? null : () => _useMyLocation(),
+              icon: Icon(Icons.my_location_rounded),
+              label: Text(_isLocating ? 'Getting location...' : 'Use current location'),
             ),
             selectedPlace != null
                 ? Column(
@@ -139,28 +254,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   )
                 : Expanded(
-                  child: Center(
-                    child: Opacity(
-                      opacity: 0.8,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        spacing: 10,
-                        children: [
-                          Icon(Icons.cloud_off_rounded, size: 64),
-                          Text('Pick a city or use location'),
-                        ],
+                    child: Center(
+                      child: Opacity(
+                        opacity: 0.8,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          spacing: 10,
+                          children: [
+                            Icon(Icons.cloud_off_rounded, size: 64),
+                            Text('Pick a city or use location'),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
           ],
         ),
       ),
     );
   }
 }
-
-
 
 class ForecastCard extends StatelessWidget {
   const ForecastCard({super.key, required this.day});
