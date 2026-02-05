@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:weather_app/models/weather.dart';
 
 class CurrentWeatherCard extends StatefulWidget {
-  const CurrentWeatherCard({super.key});
+  final Weather weather;
+
+  const CurrentWeatherCard({
+    super.key,
+    required this.weather
+  });
 
   @override
   State<CurrentWeatherCard> createState() => _CurrentWeatherCardState();
@@ -19,12 +25,12 @@ class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('-12C', style: Theme.of(context).textTheme.displaySmall),
+                Text('${widget.weather.tempC}°C', style: Theme.of(context).textTheme.displaySmall),
                 SizedBox(height: 4),
-                Text('Cloudy', style: Theme.of(context).textTheme.titleMedium),
+                Text('${widget.weather.weatherCode}', style: Theme.of(context).textTheme.titleMedium),
                 SizedBox(height: 2),
                 Text(
-                  'Feels like -18°',
+                  'Feels like -15°C',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(
                       context,

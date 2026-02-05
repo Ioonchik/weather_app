@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:weather_app/models/weather.dart';
 import 'package:weather_app/screens/search_screen.dart';
 import 'package:weather_app/services/location_service.dart';
 import 'package:weather_app/services/weather_api.dart';
@@ -48,6 +49,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final weatherApi = WeatherApi();
 
+  Weather? _weather;
+  bool _isLoadingWeather = false;
+  String? _error;
+
+  Future<void> _loadWeatherFor(Place place) async {
+    if (_isLoadingWeather) return;
+
+    setState(() {
+      _isLoadingWeather = true;
+      _error = null;
+    });
+
+    try {
+      final weather = await weatherApi.fetchWeather(place.latitude, place.longitude);
+      if (mounted) {
+        setState(() {
+          _weather = weather;
+        });
+        print(weather.tempC);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Could not load weather data: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingWeather = false;
+        });
+      }
+    }
+  }
+
   Future<void> _useMyLocation() async {
     if (_isLocating) return;
 
@@ -57,11 +93,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final position = await _locationService.getCurrentPositionOrThrow();
-
+      
       if (!mounted) return;
 
       setState(() {
         _currentPosition = position;
+        selectedPlace = Place(
+          name: 'My Location',
+          country: '',
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
       });
       print(_currentPosition);
     } on PermissionDenied {
@@ -159,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text('Weather'),
         actions: [
           selectedPlace != null
-              ? IconButton(onPressed: () {}, icon: Icon(Icons.refresh_rounded))
+              ? IconButton(onPressed: () => _loadWeatherFor(selectedPlace!), icon: Icon(Icons.refresh_rounded))
               : SizedBox.shrink(),
         ],
       ),
@@ -185,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     selectedPlace = place;
                   });
+                  _loadWeatherFor(place);
                 }
               },
             ),
@@ -198,7 +241,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     spacing: 12,
                     children: [
-                      CurrentWeatherCard(),
+                      CurrentWeatherCard(
+                        weather: _weather!,
+                      ),
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
