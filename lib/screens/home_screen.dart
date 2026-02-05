@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:weather_app/screens/search_screen.dart';
 import 'package:weather_app/services/location_service.dart';
+import 'package:weather_app/services/weather_api.dart';
 import 'package:weather_app/widgets/current_weather_card.dart';
 import 'package:weather_app/widgets/weather_stat.dart';
 
@@ -44,6 +45,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final LocationService _locationService = LocationService();
   bool _isLocating = false;
   Position? _currentPosition;
+
+  final weatherApi = WeatherApi();
 
   Future<void> _useMyLocation() async {
     if (_isLocating) return;
@@ -251,6 +254,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       Details(),
+                      TextButton(onPressed: () async {
+                        final weather = await weatherApi.fetchWeather(selectedPlace!.latitude, selectedPlace!.longitude);
+                        print(weather.tempC);
+                        print(weather.forecast.length);
+                      }, child: Text('Test API'))
                     ],
                   )
                 : Expanded(
@@ -309,26 +317,12 @@ class ForecastCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Text(
-                  //   '${day.maxTemp} / ${day.minTemp}°',
-                  //   style: Theme.of(context).textTheme.bodyMedium,
-                  // ),
-                  // Text(
-                  //   day.condition,
-                  //   style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                  //     color: Theme.of(
-                  //       context,
-                  //     ).colorScheme.onSurface.withValues(alpha: 0.6),
-                  //   ),
-                  // ),
                 ],
               ),
               SizedBox(width: 10),
               Icon(day.icon),
             ],
           ),
-
-          // SizedBox(height: 8),
         ],
       ),
     );
