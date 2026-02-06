@@ -30,7 +30,7 @@ class _CurrentWeatherCardState extends State<CurrentWeatherCard> {
                 Text('${widget.weather.weatherCode}', style: Theme.of(context).textTheme.titleMedium),
                 SizedBox(height: 2),
                 Text(
-                  'Feels like -15°C',
+                  '${widget.weather.feelsLikeC}°C feels like',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(
                       context,

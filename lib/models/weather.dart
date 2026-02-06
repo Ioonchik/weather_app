@@ -7,6 +7,7 @@ class Weather {
   final double windSpeedKmh;
   final int humidityPct; 
   final List<ForecastDay> forecast;
+  final double feelsLikeC;
   final String? timezone;
 
   Weather({
@@ -15,6 +16,7 @@ class Weather {
     required this.windSpeedKmh,
     required this.humidityPct,
     required this.forecast,
+    required this.feelsLikeC,
     this.timezone,
   });
 
@@ -40,6 +42,7 @@ class Weather {
       weatherCode: (current['weather_code'] as num).toInt(),
       windSpeedKmh: (current['wind_speed_10m'] as num).toDouble(),
       humidityPct: (current['relative_humidity_2m'] as num).toInt(),
+      feelsLikeC: (current['apparent_temperature'] as num).toDouble(),
       forecast: List<ForecastDay>.generate(minLength, (index) {
         return ForecastDay(
           date: DateTime.parse(times[index] as String),

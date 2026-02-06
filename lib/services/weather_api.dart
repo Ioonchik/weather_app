@@ -13,7 +13,7 @@ class WeatherApi {
       'latitude': latitude.toString(),
       'longitude': longitude.toString(),
       'current':
-          'temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code',
+          'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code',
       'daily': 'temperature_2m_min,temperature_2m_max,weather_code',
       'forecast_days': '7',
       'temperature_unit': 'celsius',

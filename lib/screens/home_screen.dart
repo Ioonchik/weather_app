@@ -74,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _error = 'Could not load weather data: $e';
         });
+        print('Error loading weather: $e');
       }
     } finally {
       if (mounted) {
@@ -242,7 +243,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     spacing: 12,
                     children: [
                       CurrentWeatherCard(
-                        weather: _weather!,
+                        weather: _weather ?? Weather(
+                          tempC: 0,
+                          weatherCode: 0,
+                          windSpeedKmh: 0,
+                          humidityPct: 0,
+                          feelsLikeC: 0,
+                          forecast: [],
+                        ),
                       ),
                       Card(
                         child: Padding(
