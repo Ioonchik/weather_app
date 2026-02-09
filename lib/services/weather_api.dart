@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:weather_app/models/weather.dart';
 
@@ -27,13 +29,19 @@ class WeatherApi {
       queryParameters,
     );
 
-    final response = await httpClient.get(uri);
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to load weather data');
+    try {
+      final response = await httpClient.get(uri);
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load weather data');
+      }
+      final Map<String, dynamic> jsonResponse = json.decode(response.body);
+      return Weather.fromJson(jsonResponse);
+    } on SocketException {
+      throw Exception('No Internet connection');
+    } on FormatException {
+      throw Exception('Invalid server response');
+    } catch (e) {
+      throw Exception('Failed to load weather data: $e');
     }
-
-    final Map<String, dynamic> jsonResponse = json.decode(response.body);
-    return Weather.fromJson(jsonResponse);
   }
 }

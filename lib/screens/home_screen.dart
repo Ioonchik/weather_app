@@ -62,26 +62,30 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final weather = await weatherApi.fetchWeather(place.latitude, place.longitude);
-      if (mounted) {
-        setState(() {
-          _weather = weather;
-        });
-        print(weather.tempC);
-      }
+      final weather = await weatherApi.fetchWeather(
+        place.latitude,
+        place.longitude,
+      );
+      if (!mounted) return;
+
+      setState(() {
+        _weather = weather;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Could not load weather data: $e';
-        });
-        print('Error loading weather: $e');
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading weather: $_error')),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingWeather = false;
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingWeather = false;
+      });
     }
   }
 
@@ -94,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final position = await _locationService.getCurrentPositionOrThrow();
-      
+
       if (!mounted) return;
 
       setState(() {
@@ -156,11 +160,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error getting location: $e'),
-        )
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error getting location: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -202,7 +204,10 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text('Weather'),
         actions: [
           selectedPlace != null
-              ? IconButton(onPressed: () => _loadWeatherFor(selectedPlace!), icon: Icon(Icons.refresh_rounded))
+              ? IconButton(
+                  onPressed: () => _loadWeatherFor(selectedPlace!),
+                  icon: Icon(Icons.refresh_rounded),
+                )
               : SizedBox.shrink(),
         ],
       ),
@@ -235,7 +240,9 @@ class _HomeScreenState extends State<HomeScreen> {
             TextButton.icon(
               onPressed: _isLocating ? null : () => _useMyLocation(),
               icon: Icon(Icons.my_location_rounded),
-              label: Text(_isLocating ? 'Getting location...' : 'Use current location'),
+              label: Text(
+                _isLocating ? 'Getting location...' : 'Use current location',
+              ),
             ),
             selectedPlace != null
                 ? Column(
@@ -243,14 +250,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     spacing: 12,
                     children: [
                       CurrentWeatherCard(
-                        weather: _weather ?? Weather(
-                          tempC: 0,
-                          weatherCode: 0,
-                          windSpeedKmh: 0,
-                          humidityPct: 0,
-                          feelsLikeC: 0,
-                          forecast: [],
-                        ),
+                        weather:
+                            _weather ??
+                            Weather(
+                              tempC: 0,
+                              weatherCode: 0,
+                              windSpeedKmh: 0,
+                              humidityPct: 0,
+                              feelsLikeC: 0,
+                              forecast: [],
+                            ),
                       ),
                       Card(
                         child: Padding(
@@ -307,11 +316,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       Details(),
-                      TextButton(onPressed: () async {
-                        final weather = await weatherApi.fetchWeather(selectedPlace!.latitude, selectedPlace!.longitude);
-                        print(weather.tempC);
-                        print(weather.forecast.length);
-                      }, child: Text('Test API'))
+                      TextButton(
+                        onPressed: () async {
+                          final weather = await weatherApi.fetchWeather(
+                            selectedPlace!.latitude,
+                            selectedPlace!.longitude,
+                          );
+                          print(weather.tempC);
+                          print(weather.forecast.length);
+                        },
+                        child: Text('Test API'),
+                      ),
                     ],
                   )
                 : Expanded(
