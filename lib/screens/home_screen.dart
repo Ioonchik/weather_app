@@ -5,6 +5,7 @@ import 'package:weather_app/screens/search_screen.dart';
 import 'package:weather_app/services/location_service.dart';
 import 'package:weather_app/services/weather_api.dart';
 import 'package:weather_app/widgets/current_weather_card.dart';
+import 'package:weather_app/widgets/loading_skeleton.dart';
 import 'package:weather_app/widgets/weather_stat.dart';
 
 import '../models/place.dart';
@@ -50,14 +51,16 @@ class _HomeScreenState extends State<HomeScreen> {
   final weatherApi = WeatherApi();
 
   Weather? _weather;
-  bool _isLoadingWeather = false;
+  bool _isFetchingWeather = false;
+  bool _isRefreshingWeather = false;
   String? _error;
 
   Future<void> _loadWeatherFor(Place place) async {
-    if (_isLoadingWeather) return;
+    if (_isFetchingWeather) return;
 
     setState(() {
-      _isLoadingWeather = true;
+      _isFetchingWeather = true;
+      _isRefreshingWeather = _weather != null;
       _error = null;
     });
 
@@ -77,14 +80,15 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading weather: $_error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading weather: $_error')));
     } finally {
       if (!mounted) return;
 
       setState(() {
-        _isLoadingWeather = false;
+        _isFetchingWeather = false;
+        _isRefreshingWeather = false;
       });
     }
   }
@@ -199,13 +203,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final showSkeleton = _isFetchingWeather && _weather == null;
+    final isRefreshing = _isRefreshingWeather;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Weather'),
         actions: [
           selectedPlace != null
               ? IconButton(
-                  onPressed: () => _loadWeatherFor(selectedPlace!),
+                  onPressed: isRefreshing
+                      ? null
+                      : () => _loadWeatherFor(selectedPlace!),
                   icon: Icon(Icons.refresh_rounded),
                 )
               : SizedBox.shrink(),
@@ -217,6 +226,20 @@ class _HomeScreenState extends State<HomeScreen> {
           spacing: 16,
           children: [
             InkWell(
+              onTap: _isRefreshingWeather
+                  ? null
+                  : () async {
+                      final Place? place = await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SearchScreen()),
+                      );
+                      if (place != null) {
+                        setState(() {
+                          selectedPlace = place;
+                        });
+                        _loadWeatherFor(place);
+                      }
+                    },
               child: IgnorePointer(
                 child: SearchBar(
                   hintText: selectedPlace?.name ?? 'Search city',
@@ -224,18 +247,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   readOnly: true,
                 ),
               ),
-              onTap: () async {
-                final Place? place = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SearchScreen()),
-                );
-                if (place != null) {
-                  setState(() {
-                    selectedPlace = place;
-                  });
-                  _loadWeatherFor(place);
-                }
-              },
             ),
             TextButton.icon(
               onPressed: _isLocating ? null : () => _useMyLocation(),
@@ -244,106 +255,115 @@ class _HomeScreenState extends State<HomeScreen> {
                 _isLocating ? 'Getting location...' : 'Use current location',
               ),
             ),
-            selectedPlace != null
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 12,
-                    children: [
-                      CurrentWeatherCard(
-                        weather:
-                            _weather ??
-                            Weather(
-                              tempC: 0,
-                              weatherCode: 0,
-                              windSpeedKmh: 0,
-                              humidityPct: 0,
-                              feelsLikeC: 0,
-                              forecast: [],
+            if (showSkeleton)
+              const WeatherSkeletonPage()
+            else if (_weather != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 12,
+                children: [
+                  CurrentWeatherCard(weather: _weather!),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: WeatherStat(
+                              icon: Icons.air,
+                              label: 'Wind',
+                              value: '4 km/h',
                             ),
-                      ),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
                           ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: WeatherStat(
-                                  icon: Icons.air,
-                                  label: 'Wind',
-                                  value: '4 km/h',
-                                ),
-                              ),
-                              Container(
-                                height: 36,
-                                width: 1,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.12),
-                              ),
-                              Expanded(
-                                child: WeatherStat(
-                                  icon: Icons.water_drop,
-                                  label: 'Humidity',
-                                  value: '72%',
-                                ),
-                              ),
-                              Container(
-                                height: 36,
-                                width: 1,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.12),
-                              ),
-                              Expanded(
-                                child: WeatherStat(
-                                  icon: Icons.speed,
-                                  label: 'Pressure',
-                                  value: '1016 hPa',
-                                ),
-                              ),
-                            ],
+                          Container(
+                            height: 36,
+                            width: 1,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.12),
                           ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: Text(
-                          '7-Day Forecast',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      Details(),
-                      TextButton(
-                        onPressed: () async {
-                          final weather = await weatherApi.fetchWeather(
-                            selectedPlace!.latitude,
-                            selectedPlace!.longitude,
-                          );
-                          print(weather.tempC);
-                          print(weather.forecast.length);
-                        },
-                        child: Text('Test API'),
-                      ),
-                    ],
-                  )
-                : Expanded(
-                    child: Center(
-                      child: Opacity(
-                        opacity: 0.8,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          spacing: 10,
-                          children: [
-                            Icon(Icons.cloud_off_rounded, size: 64),
-                            Text('Pick a city or use location'),
-                          ],
-                        ),
+                          Expanded(
+                            child: WeatherStat(
+                              icon: Icons.water_drop,
+                              label: 'Humidity',
+                              value: '72%',
+                            ),
+                          ),
+                          Container(
+                            height: 36,
+                            width: 1,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.12),
+                          ),
+                          Expanded(
+                            child: WeatherStat(
+                              icon: Icons.speed,
+                              label: 'Pressure',
+                              value: '1016 hPa',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(
+                      '7-Day Forecast',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  Details(),
+                  TextButton(
+                    onPressed: () async {
+                      final weather = await weatherApi.fetchWeather(
+                        selectedPlace!.latitude,
+                        selectedPlace!.longitude,
+                      );
+                      print(weather.tempC);
+                      print(weather.forecast.length);
+                    },
+                    child: Text('Test API'),
+                  ),
+                ],
+              )
+            else if (_error != null)
+              Expanded(
+                child: Center(
+                  child: Opacity(
+                    opacity: 0.8,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 10,
+                      children: [
+                        Icon(Icons.error_outline_rounded, size: 64),
+                        Text('Error loading weather'),
+                        Text(_error!),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else
+              Expanded(
+                child: Center(
+                  child: Opacity(
+                    opacity: 0.8,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 10,
+                      children: [
+                        Icon(Icons.cloud_off_rounded, size: 64),
+                        Text('Pick a city or use location'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
