@@ -54,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isFetchingWeather = false;
   bool _isRefreshingWeather = false;
   String? _error;
+  DateTime? _lastUpdated;
 
   Future<void> _loadWeatherFor(Place place) async {
     if (_isFetchingWeather) return;
@@ -73,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _weather = weather;
+        _lastUpdated = DateTime.now();
       });
     } catch (e) {
       if (!mounted) return;
@@ -215,7 +217,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: isRefreshing
                       ? null
                       : () => _loadWeatherFor(selectedPlace!),
-                  icon: Icon(Icons.refresh_rounded),
+                  icon: 
+                    _isRefreshingWeather
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(Icons.refresh_rounded),
                 )
               : SizedBox.shrink(),
         ],
@@ -263,6 +272,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 spacing: 12,
                 children: [
                   CurrentWeatherCard(weather: _weather!),
+                  Text(
+                    _lastUpdated != null
+                        ? 'Last updated: ${_lastUpdated!.hour.toString().padLeft(2, '0')}:${_lastUpdated!.minute.toString().padLeft(2, '0')}'
+                        : 'Last updated: -',
+                  ),
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
