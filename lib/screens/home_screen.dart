@@ -56,13 +56,14 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _error;
   DateTime? _lastUpdated;
 
+  bool _isRetryingFromError = false;
+
   Future<void> _loadWeatherFor(Place place) async {
     if (_isFetchingWeather) return;
 
     setState(() {
       _isFetchingWeather = true;
       _isRefreshingWeather = _weather != null;
-      _error = null;
     });
 
     try {
@@ -82,15 +83,18 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading weather: $_error')));
+      if (!_isRetryingFromError) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading weather: $_error')));
+      }
     } finally {
       if (!mounted) return;
 
       setState(() {
         _isFetchingWeather = false;
         _isRefreshingWeather = false;
+        _isRetryingFromError = false;
       });
     }
   }
@@ -205,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final showSkeleton = _isFetchingWeather && _weather == null;
+    final showSkeleton = _isFetchingWeather && _weather == null && !_isRetryingFromError;
     final isRefreshing = _isRefreshingWeather;
 
     return Scaffold(
@@ -217,168 +221,192 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: isRefreshing
                       ? null
                       : () => _loadWeatherFor(selectedPlace!),
-                  icon: 
-                    _isRefreshingWeather
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(Icons.refresh_rounded),
+                  icon: _isRefreshingWeather
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(Icons.refresh_rounded),
                 )
               : SizedBox.shrink(),
         ],
       ),
       body: Padding(
         padding: EdgeInsets.all(16),
-        child: Column(
-          spacing: 16,
-          children: [
-            InkWell(
-              onTap: _isRefreshingWeather
-                  ? null
-                  : () async {
-                      final Place? place = await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => SearchScreen()),
-                      );
-                      if (place != null) {
-                        setState(() {
-                          selectedPlace = place;
-                        });
-                        _loadWeatherFor(place);
-                      }
-                    },
-              child: IgnorePointer(
-                child: SearchBar(
-                  hintText: selectedPlace?.name ?? 'Search city',
-                  leading: Icon(Icons.search_rounded),
-                  readOnly: true,
-                ),
-              ),
-            ),
-            TextButton.icon(
-              onPressed: _isLocating ? null : () => _useMyLocation(),
-              icon: Icon(Icons.my_location_rounded),
-              label: Text(
-                _isLocating ? 'Getting location...' : 'Use current location',
-              ),
-            ),
-            if (showSkeleton)
-              const WeatherSkeletonPage()
-            else if (_weather != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 12,
-                children: [
-                  CurrentWeatherCard(weather: _weather!),
-                  Text(
-                    _lastUpdated != null
-                        ? 'Last updated: ${_lastUpdated!.hour.toString().padLeft(2, '0')}:${_lastUpdated!.minute.toString().padLeft(2, '0')}'
-                        : 'Last updated: -',
+        child: RefreshIndicator(
+          onRefresh: () async {
+            if (selectedPlace != null && !_isFetchingWeather) {
+              await _loadWeatherFor(selectedPlace!);
+            }
+          },
+          child: SingleChildScrollView(
+            physics: _weather == null
+                ? const NeverScrollableScrollPhysics()
+                : const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              spacing: 16,
+              children: [
+                InkWell(
+                  onTap: _isRefreshingWeather
+                      ? null
+                      : () async {
+                          final Place? place = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SearchScreen(),
+                            ),
+                          );
+                          if (place != null) {
+                            setState(() {
+                              selectedPlace = place;
+                            });
+                            _loadWeatherFor(place);
+                          }
+                        },
+                  child: IgnorePointer(
+                    child: SearchBar(
+                      hintText: selectedPlace?.name ?? 'Search city',
+                      leading: Icon(Icons.search_rounded),
+                      readOnly: true,
+                    ),
                   ),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                ),
+                TextButton.icon(
+                  onPressed: (_isLocating || _isFetchingWeather)
+                      ? null
+                      : () => _useMyLocation(),
+                  icon: Icon(Icons.my_location_rounded),
+                  label: Text(
+                    _isLocating
+                        ? 'Getting location...'
+                        : 'Use current location',
+                  ),
+                ),
+                if (showSkeleton)
+                  const WeatherSkeletonPage()
+                else if (_weather != null)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 12,
+                    children: [
+                      CurrentWeatherCard(weather: _weather!),
+                      Text(
+                        _lastUpdated != null
+                            ? 'Last updated: ${_lastUpdated!.hour.toString().padLeft(2, '0')}:${_lastUpdated!.minute.toString().padLeft(2, '0')}'
+                            : 'Last updated: -',
                       ),
-                      child: Row(
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: WeatherStat(
+                                  icon: Icons.air,
+                                  label: 'Wind',
+                                  value: '4 km/h',
+                                ),
+                              ),
+                              Container(
+                                height: 36,
+                                width: 1,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.12),
+                              ),
+                              Expanded(
+                                child: WeatherStat(
+                                  icon: Icons.water_drop,
+                                  label: 'Humidity',
+                                  value: '72%',
+                                ),
+                              ),
+                              Container(
+                                height: 36,
+                                width: 1,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.12),
+                              ),
+                              Expanded(
+                                child: WeatherStat(
+                                  icon: Icons.speed,
+                                  label: 'Pressure',
+                                  value: '1016 hPa',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(
+                          '7-Day Forecast',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      Details(),
+                      TextButton(
+                        onPressed: () async {
+                          final weather = await weatherApi.fetchWeather(
+                            selectedPlace!.latitude,
+                            selectedPlace!.longitude,
+                          );
+                          print(weather.tempC);
+                          print(weather.forecast.length);
+                        },
+                        child: Text('Test API'),
+                      ),
+                    ],
+                  )
+                else if (_error != null)
+                  Center(
+                    child: Opacity(
+                      opacity: 0.8,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: 10,
                         children: [
-                          Expanded(
-                            child: WeatherStat(
-                              icon: Icons.air,
-                              label: 'Wind',
-                              value: '4 km/h',
+                          Icon(Icons.error_outline_rounded, size: 64),
+                          Text('Error loading weather'),
+                          Text(_error!),
+                          if (selectedPlace != null)
+                            FilledButton(
+                              onPressed: _isFetchingWeather || _isRetryingFromError ? null : () {
+                                setState(() {
+                                  _isRetryingFromError = true;
+                                });
+                                
+                                _loadWeatherFor(selectedPlace!);
+                              },
+                              child: _isRetryingFromError ? Text('Retrying...') : Text('Retry'),
                             ),
-                          ),
-                          Container(
-                            height: 36,
-                            width: 1,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.12),
-                          ),
-                          Expanded(
-                            child: WeatherStat(
-                              icon: Icons.water_drop,
-                              label: 'Humidity',
-                              value: '72%',
-                            ),
-                          ),
-                          Container(
-                            height: 36,
-                            width: 1,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.12),
-                          ),
-                          Expanded(
-                            child: WeatherStat(
-                              icon: Icons.speed,
-                              label: 'Pressure',
-                              value: '1016 hPa',
-                            ),
-                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Center(
+                    child: Opacity(
+                      opacity: 0.8,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: 10,
+                        children: [
+                          Icon(Icons.cloud_off_rounded, size: 64),
+                          Text('Pick a city or use location'),
                         ],
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text(
-                      '7-Day Forecast',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  Details(),
-                  TextButton(
-                    onPressed: () async {
-                      final weather = await weatherApi.fetchWeather(
-                        selectedPlace!.latitude,
-                        selectedPlace!.longitude,
-                      );
-                      print(weather.tempC);
-                      print(weather.forecast.length);
-                    },
-                    child: Text('Test API'),
-                  ),
-                ],
-              )
-            else if (_error != null)
-              Expanded(
-                child: Center(
-                  child: Opacity(
-                    opacity: 0.8,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      spacing: 10,
-                      children: [
-                        Icon(Icons.error_outline_rounded, size: 64),
-                        Text('Error loading weather'),
-                        Text(_error!),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            else
-              Expanded(
-                child: Center(
-                  child: Opacity(
-                    opacity: 0.8,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      spacing: 10,
-                      children: [
-                        Icon(Icons.cloud_off_rounded, size: 64),
-                        Text('Pick a city or use location'),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
