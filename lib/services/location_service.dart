@@ -1,4 +1,5 @@
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LocationService {
   Future<void> ensureServiceEnabled() async {
@@ -34,6 +35,14 @@ class LocationService {
       ),
     );
   }
+
+  Future<void> saveLastKnownPosition(Position position) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('last_latitude', position.latitude);
+    await prefs.setDouble('last_longitude', position.longitude);
+
+  }
+
 }
 
 class LocationServiceDisabled implements Exception {}

@@ -1,12 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:weather_app/models/weather.dart';
 import 'package:weather_app/screens/search_screen.dart';
 import 'package:weather_app/services/location_service.dart';
 import 'package:weather_app/services/weather_api.dart';
+import 'package:weather_app/utils/cache_keys.dart';
 import 'package:weather_app/widgets/current_weather_card.dart';
 import 'package:weather_app/widgets/loading_skeleton.dart';
 import 'package:weather_app/widgets/weather_stat.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/place.dart';
 
@@ -58,35 +62,59 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isRetryingFromError = false;
 
-  Future<void> _loadWeatherFor(Place place) async {
+  bool _didInitLoad = false;
+  bool _isOffline = false;
+
+  Future<void> _loadWeatherFor(
+    Place place, {
+    bool showSnackOnFail = true,
+  }) async {
     if (_isFetchingWeather) return;
 
     setState(() {
       _isFetchingWeather = true;
       _isRefreshingWeather = _weather != null;
+      _error = null;
+      _isOffline = false;
     });
 
     try {
-      final weather = await weatherApi.fetchWeather(
+      final result = await weatherApi.fetchWeatherWithRawJson(
         place.latitude,
         place.longitude,
       );
+
       if (!mounted) return;
 
+      final now = DateTime.now();
+
       setState(() {
-        _weather = weather;
-        _lastUpdated = DateTime.now();
+        _weather = result.weather;
+        _lastUpdated = now;
+        _isOffline = false;
+        _error = null;
       });
+
+      await _saveLastKnownWeather(
+        place: place,
+        fullResponseJson: result.rawJson,
+        updatedAt: now,
+      );
     } catch (e) {
       if (!mounted) return;
 
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      final hasCachedShown = _weather != null;
+
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = msg;
+        _isOffline = hasCachedShown;
       });
-      if (!_isRetryingFromError) {
+
+      if (!_isRetryingFromError && showSnackOnFail && !hasCachedShown) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error loading weather: $_error')));
+        ).showSnackBar(SnackBar(content: Text('Error loading weather: $msg')));
       }
     } finally {
       if (!mounted) return;
@@ -207,9 +235,140 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> loadLastKnownLocationWeather() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastLatitude = prefs.getDouble('last_latitude');
+    final lastLongitude = prefs.getDouble('last_longitude');
+    final lastPlaceName = prefs.getString('last_place_name') ?? 'Last location';
+    final lastTemperature = prefs.getDouble('last_temperature');
+    print(
+      'Last known location: $lastLatitude, $lastLongitude, $lastPlaceName, $lastTemperature',
+    );
+
+    if (lastLatitude != null && lastLongitude != null) {
+      final place = Place(
+        name: lastPlaceName,
+        country: '',
+        latitude: lastLatitude,
+        longitude: lastLongitude,
+      );
+      final weather = Weather(
+        tempC: lastTemperature ?? 0,
+        feelsLikeC: 0,
+        humidityPct: 0,
+        windSpeedKmh: 0,
+        weatherCode: 0,
+        forecast: [],
+      );
+      setState(() {
+        selectedPlace = place;
+        _weather = weather;
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_didInitLoad) return;
+      _didInitLoad = true;
+      _loadCachedThenRefresh();
+    });
+  }
+
+  Future<void> _loadCachedThenRefresh() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final cachedJson = prefs.getString(CacheKeys.cachedWeatherJson);
+    final lastLat = prefs.getDouble(CacheKeys.cachedLat);
+    final lastLon = prefs.getDouble(CacheKeys.cachedLon);
+    final lastName = prefs.getString(CacheKeys.cachedPlaceName);
+    final updatedIso = prefs.getString(CacheKeys.cachedUpdatedAtIso);
+
+    // If we have enough to restore
+    if (cachedJson != null &&
+        lastLat != null &&
+        lastLon != null &&
+        lastName != null) {
+      try {
+        final Map<String, dynamic> map = jsonDecode(cachedJson);
+        final cachedWeather = Weather.fromJson(map); // make sure you have this
+        final place = Place(
+          name: lastName,
+          country: '',
+          latitude: lastLat,
+          longitude: lastLon,
+        );
+
+        setState(() {
+          selectedPlace = place;
+          _weather = cachedWeather;
+          _lastUpdated = updatedIso != null
+              ? DateTime.tryParse(updatedIso)
+              : null;
+          _isOffline = false;
+          _error = null;
+        });
+
+        // Refresh in background (don’t block UI)
+        await _loadWeatherFor(place, showSnackOnFail: false);
+        return;
+      } catch (_) {
+        // If cache is corrupted, ignore and proceed as fresh.
+      }
+    }
+
+    // If no cache, do nothing (your old behavior: empty until user picks).
+  }
+
+  Future<void> _saveLastKnownWeather({
+    required Place place,
+    required Map<String, dynamic> fullResponseJson,
+    required DateTime updatedAt,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setString(
+      CacheKeys.cachedWeatherJson,
+      jsonEncode(fullResponseJson),
+    );
+    await prefs.setString(CacheKeys.cachedPlaceName, place.name);
+    await prefs.setDouble(CacheKeys.cachedLat, place.latitude);
+    await prefs.setDouble(CacheKeys.cachedLon, place.longitude);
+    await prefs.setString(
+      CacheKeys.cachedUpdatedAtIso,
+      updatedAt.toIso8601String(),
+    );
+  }
+
+  Widget _offlineBanner() {
+    if (!_isOffline || _lastUpdated == null) return const SizedBox.shrink();
+
+    final t = _lastUpdated!;
+    final hh = t.hour.toString().padLeft(2, '0');
+    final mm = t.minute.toString().padLeft(2, '0');
+
+    return MaterialBanner(
+      content: Text('Offline — showing last update ($hh:$mm)'),
+      actions: [
+        TextButton(
+          onPressed: () {
+            if (selectedPlace != null) {
+              _loadWeatherFor(selectedPlace!, showSnackOnFail: true);
+            }
+          },
+          child: const Text('Retry'),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final showSkeleton = _isFetchingWeather && _weather == null && !_isRetryingFromError;
+    final showSkeleton =
+        _isFetchingWeather && _weather == null && !_isRetryingFromError;
     final isRefreshing = _isRefreshingWeather;
 
     return Scaffold(
@@ -247,6 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               spacing: 16,
               children: [
+                _offlineBanner(),
                 InkWell(
                   onTap: _isRefreshingWeather
                       ? null
@@ -283,6 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         : 'Use current location',
                   ),
                 ),
+                
                 if (showSkeleton)
                   const WeatherSkeletonPage()
                 else if (_weather != null)
@@ -377,14 +538,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(_error!),
                           if (selectedPlace != null)
                             FilledButton(
-                              onPressed: _isFetchingWeather || _isRetryingFromError ? null : () {
-                                setState(() {
-                                  _isRetryingFromError = true;
-                                });
-                                
-                                _loadWeatherFor(selectedPlace!);
-                              },
-                              child: _isRetryingFromError ? Text('Retrying...') : Text('Retry'),
+                              onPressed:
+                                  _isFetchingWeather || _isRetryingFromError
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        _isRetryingFromError = true;
+                                      });
+
+                                      _loadWeatherFor(selectedPlace!);
+                                    },
+                              child: _isRetryingFromError
+                                  ? Text('Retrying...')
+                                  : Text('Retry'),
                             ),
                         ],
                       ),

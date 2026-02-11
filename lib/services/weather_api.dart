@@ -3,6 +3,12 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:weather_app/models/weather.dart';
 
+class WeatherFetchResult {
+  final Weather weather;
+  final Map<String, dynamic> rawJson;
+  WeatherFetchResult({required this.weather, required this.rawJson});
+}
+
 class WeatherApi {
   final http.Client httpClient;
 
@@ -43,4 +49,22 @@ class WeatherApi {
       throw Exception('Failed to load weather data: $e');
     }
   }
+
+  Future<WeatherFetchResult> fetchWeatherWithRawJson(double lat, double lon) async {
+    final uri = Uri.parse(
+      'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_min,temperature_2m_max,weather_code&forecast_days=7&temperature_unit=celsius&wind_speed_unit=kmh&timezone=auto'
+    );
+
+    final resp = await http.get(uri);
+    if (resp.statusCode != 200) {
+      throw Exception('Weather fetch failed: ${resp.statusCode}');
+    }
+
+    final Map<String, dynamic> jsonMap = jsonDecode(resp.body);
+    final weather = Weather.fromJson(jsonMap);
+
+    return WeatherFetchResult(weather: weather, rawJson: jsonMap);
+  }
+
+  
 }
