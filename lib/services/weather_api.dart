@@ -20,7 +20,7 @@ class WeatherApi {
       'latitude': latitude.toString(),
       'longitude': longitude.toString(),
       'current':
-          'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code',
+          'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,surface_pressure',
       'daily': 'temperature_2m_min,temperature_2m_max,weather_code',
       'forecast_days': '7',
       'temperature_unit': 'celsius',
@@ -50,12 +50,15 @@ class WeatherApi {
     }
   }
 
-  Future<WeatherFetchResult> fetchWeatherWithRawJson(double lat, double lon) async {
+  Future<WeatherFetchResult> fetchWeatherWithRawJson(
+    double lat,
+    double lon,
+  ) async {
     final uri = Uri.parse(
-      'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_min,temperature_2m_max,weather_code&forecast_days=7&temperature_unit=celsius&wind_speed_unit=kmh&timezone=auto'
+      'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,surface_pressure,weather_code&daily=temperature_2m_min,temperature_2m_max,weather_code&forecast_days=7&temperature_unit=celsius&wind_speed_unit=kmh&timezone=auto',
     );
 
-    final resp = await http.get(uri);
+    final resp = await httpClient.get(uri);
     if (resp.statusCode != 200) {
       throw Exception('Weather fetch failed: ${resp.statusCode}');
     }
@@ -65,6 +68,4 @@ class WeatherApi {
 
     return WeatherFetchResult(weather: weather, rawJson: jsonMap);
   }
-
-  
 }

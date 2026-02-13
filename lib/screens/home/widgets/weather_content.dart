@@ -35,7 +35,7 @@ class WeatherContent extends StatelessWidget {
                   child: WeatherStat(
                     icon: Icons.air,
                     label: 'Wind',
-                    value: '4 km/h',
+                    value: '${weather.windSpeedKmh.round().toString()} km/h',
                   ),
                 ),
                 Container(
@@ -49,7 +49,7 @@ class WeatherContent extends StatelessWidget {
                   child: WeatherStat(
                     icon: Icons.water_drop,
                     label: 'Humidity',
-                    value: '72%',
+                    value: '${weather.humidityPct.toString()}%',
                   ),
                 ),
                 Container(
@@ -63,7 +63,7 @@ class WeatherContent extends StatelessWidget {
                   child: WeatherStat(
                     icon: Icons.speed,
                     label: 'Pressure',
-                    value: '1016 hPa',
+                    value: weather.pressure != null ? '${weather.pressure!.round().toString()} hPa' : 'N/A',
                   ),
                 ),
               ],

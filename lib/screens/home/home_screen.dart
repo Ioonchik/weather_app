@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _error = null;
       });
 
-      cache.save(
+      await cache.save(
         place: place,
         fullResponseJson: result.rawJson,
         updatedAt: now,
@@ -275,9 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           },
           child: SingleChildScrollView(
-            physics: _weather == null
-                ? const NeverScrollableScrollPhysics()
-                : const AlwaysScrollableScrollPhysics(),
+            physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               spacing: 16,
               children: [
